@@ -63,7 +63,7 @@ sortKeys() {
 	entry=`tail -n -1 ~/.keys.tmp`
 	i=1
 	while [ ! "$entry" = "" ]; do
-		printf -v entry "%-"$alignCols"s(%s)" $entry ${availableSystemHosts[$entry]}
+		printf -v entry "%-"$alignCols"s (%s)" $entry ${availableSystemHosts[$entry]}
 		sortedKeys[$i]="$entry"
 		i=$((i + 1))
 		sed -ie '$d' ~/.keys.tmp
@@ -80,9 +80,10 @@ showUsage() {
 	echo
 	echo "Examples:"
 	echo "  $scriptName -c 10"
-	echo "           Prompts to connect to remote list"
+	echo "           Prompts to connect to remote hosts list. Sets remote name to use 10 characters, trimming if longer and completing with whitespaces if shorter."
 	echo
-	echo "  $scriptName -c 10"
+	echo "  $scriptName -xr 2"
+	echo "           Connects you to the #2 remote if available, else prompts with the remote hosts list. Prints the command used to connect."
 	echo
 	echo "Options:"
 	echo "  -h       Shows this help text and exits."
