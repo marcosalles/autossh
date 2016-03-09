@@ -1,4 +1,4 @@
-#!/usr/local/bin/bash
+#!/bin/bash
 
 # Declares remote info maps
 declare -A availableSystems
@@ -158,12 +158,14 @@ downloadFromRemote() {
 	if [ ${#fileNames[@]} -eq 0 ]; then
 		echo "You need to specify a folder or file to download."
 	else
+		fileNames=`echo "\"${fileNames[@]}\""`
 		if [ "$explainMode" = "on" ]; then
 			echo "The following command will be executed:"
-			echo "scp -i $systemKey $systemHost:\"${fileNames[@]}\" \"$downloadPath\""
+			echo "scp -i $systemKey $systemHost:${fileNames} \"$downloadPath\""
 		fi
 		echo "Downloading files from $system.."
-		scp -i $systemKey $systemHost:"${fileNames[@]}" "$downloadPath"
+		# Workaround because the fuckin bash is surrounding my string with single-quotes
+		eval `echo "scp -i $systemKey $systemHost:${fileNames} \"$downloadPath\""`
 	fi
 }
 
