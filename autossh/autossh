@@ -155,15 +155,15 @@ connectToRemote() {
 
 # Downloads files from remote using SCP
 downloadFromRemote() {
-	if ! [ ${#fileNames[@]} -eq 1 ]; then
+	if [ ${#fileNames[@]} -eq 0 ]; then
 		echo "You need to specify a folder or file to download."
 	else
 		if [ "$explainMode" = "on" ]; then
 			echo "The following command will be executed:"
-			echo "scp -i $systemKey $systemHost:\"${fileNames}\" \"$downloadPath\""
+			echo "scp -i $systemKey $systemHost:\"${fileNames[@]}\" \"$downloadPath\""
 		fi
 		echo "Downloading files from $system.."
-		scp -i $systemKey $systemHost:"${fileNames}" "$downloadPath"
+		scp -i $systemKey $systemHost:"${fileNames[@]}" "$downloadPath"
 	fi
 }
 
