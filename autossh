@@ -1,0 +1,176 @@
+#!/usr/local/bin/bash
+
+while getopts :c:m:d:u:h opt; do
+	NUMBER_REGEX='^[0-9]+$'
+	case $opt in
+		c)
+			if [[ $OPTARG =~ $NUMBER_REGEX ]]; then
+				cols=$OPTARG;
+			fi;;
+		m)
+			if [[ $OPTARG =~ $NUMBER_REGEX ]]; then
+				machine=$OPTARG;
+			fi;;
+		d)
+			downloadPath="$OPTARG";;
+		u)
+			uploadPath="$OPTARG";;
+		h)
+			showHelp="on";;
+		:)
+			echo "Option -$OPTARG requires an argument.";;
+	esac
+done
+declare -a fileNames
+if [ $# -ge $OPTIND ]; then
+	args=( $@ )
+	for i in `seq $((OPTIND-1)) $((${#args[@]}-1))`; do
+		fileNames=(${fileNames[@]} ${args[$i]})
+	done
+	unset args
+fi
+
+# Defaults
+alignCols=${cols:-30}
+REMOTE_HOSTS_LIST=${REMOTE_HOSTS_LIST:-~/ssh_hosts_list}
+
+declare -A availableSystems
+declare -A availableSystemHosts
+
+# Load remote hosts
+source $REMOTE_HOSTS_LIST
+# List file entry example - you need both array assignment lines to register a new machine
+# The machine name cant contain any special characters or white spaces
+#   name="Machine-name-no-spaces-or-special-characters"
+#   availableSystems[$name]=/path/to/your/private/key
+#   availableSystemHosts[$name]=user@host.address
+
+# Stores number of available machines
+machineCount=${#availableSystems[@]}
+# Sorts machines alphabetically by name
+sortKeys() {
+	for id in "${!availableSystems[@]}"; do
+		echo $id;
+	done | sort -r > ~/.keys.tmp
+	entry=`tail -n -1 ~/.keys.tmp`
+	i=1
+	while [ ! "$entry" = "" ]; do
+		printf -v entry "%-"$alignCols"s(%s)" $entry ${availableSystemHosts[$entry]}
+		sortedKeys[$i]="$entry"
+		i=$((i + 1))
+		sed -ie '$d' ~/.keys.tmp
+		entry=`tail -n -1 ~/.keys.tmp`
+	done
+	rm ~/.keys.tmp
+}
+
+selectMachine() {
+	select selectedMachine in "${sortedKeys[@]}" Sair
+	do
+		case $selectedMachine in
+			Sair)
+			  echo 0;
+				break;;
+			*)
+				if [ $REPLY -gt ${#sortedKeys[@]} ] || [ $REPLY -lt 1 ]; then
+					shift;
+				else
+					echo $REPLY;
+					break;
+				fi
+		esac
+	done
+}
+
+showUsage() {
+	scriptName=`basename "$0"`
+	echo "Usage:"
+	echo "  $scriptName [option:argument] [files]"
+	echo
+	echo "Options:"
+	echo "  -h    show this help"
+	echo
+	echo "  -m n  n: machine number. Skips the machine listing and uses the"
+	echo "        machine attached to that number, if valid. Ignores non-integers."
+	echo
+	echo "  -c n  n: machine name offset size. Number of columns the machine"
+	echo "        name will use, with blanks on the right."
+	echo "        Default: 30"
+	echo
+	echo "  -u f  f: file path. Path where uploaded files will be saved remotely."
+	echo
+	echo "  -d f  f: file path. Path where downloaded files will be saved locally."
+	if [ $machineCount -eq 0 ]; then
+		echo
+		echo "You have no machines registered. To register a machine, create a"
+		echo "REMOTE_HOSTS_LIST file, export its path to the REMOTE_HOSTS_LIST variable"
+		echo "and follow the pattern, one for each entry:"
+		echo "  name=\"Machine-name-no-spaces-or-special-characters\""
+		echo "  availableSystems[\$name]=/path/to/your/private/key"
+		echo "  availableSystemHosts[\$name]=user@host.address"
+	fi
+}
+
+getMachineParams() {
+	for i in "${!sortedKeys[@]}"; do
+		if [ $i -eq $1 ]; then
+			system=`echo ${sortedKeys[$i]} | cut -d" " -f1`
+			systemKey=${availableSystems[$system]}
+			systemHost=${availableSystemHosts[$system]}
+			break
+		fi
+	done
+}
+
+connectToMachine() {
+	echo "Connecting to $system.."
+	ssh -i $systemKey $systemHost
+}
+
+downloadFromMachine() {
+	if ! [ ${#fileNames[@]} -eq 1 ]; then
+		echo "You need to specify a folder or file to download."
+	else
+		echo "Downloading files from $system.."
+		scp -i $systemKey $systemHost:"${fileNames}" "$downloadPath"
+	fi
+}
+
+uploadToMachine() {
+	if [ ${#fileNames[@]} -eq 0 ]; then
+		echo "You need to specify folders or files to upload."
+	else
+		echo "Uploading files to $system.."
+		scp -i $systemKey "${fileNames[@]}" $systemHost:"$uploadPath"
+	fi
+}
+
+start() {
+	if [ $machineCount -eq 0 ] || ! [ -z "${showHelp+x}" ]; then
+		showUsage
+		exit 0
+	fi
+	declare -a sortedKeys; sortKeys
+	if [ -z ${machine+x} ]; then
+		machine=$(selectMachine)
+	fi
+	if [ $machine -lt 0 ] || [ $machine -gt $machineCount ]; then
+		echo "You picked an invalid machine."
+		machine=$(selectMachine)
+	fi
+	if [ $machine -eq 0 ]; then
+		exit 1
+	fi
+	getMachineParams $machine
+	echo
+
+	if ! [ -z "${downloadPath+x}" ]; then
+		downloadFromMachine
+	elif ! [ -z "${uploadPath+x}" ]; then
+		uploadToMachine
+	else
+		connectToMachine
+	fi
+}
+
+start
