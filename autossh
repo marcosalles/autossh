@@ -1,8 +1,15 @@
 #!/usr/local/bin/bash
 
-while getopts :c:m:d:u:h opt; do
+# Loads params
+while getopts :hec:m:d:u: opt; do
 	NUMBER_REGEX='^[0-9]+$'
 	case $opt in
+		h)
+			showHelp="on";
+			break;;
+		e)
+			editMode="on";
+			break;;
 		c)
 			if [[ $OPTARG =~ $NUMBER_REGEX ]]; then
 				cols=$OPTARG;
@@ -15,38 +22,37 @@ while getopts :c:m:d:u:h opt; do
 			downloadPath="$OPTARG";;
 		u)
 			uploadPath="$OPTARG";;
-		h)
-			showHelp="on";;
 		:)
 			echo "Option -$OPTARG requires an argument.";;
 	esac
 done
-declare -a fileNames
-if [ $# -ge $OPTIND ]; then
-	args=( $@ )
-	for i in `seq $((OPTIND-1)) $((${#args[@]}-1))`; do
-		fileNames=(${fileNames[@]} ${args[$i]})
-	done
-	unset args
+
+# Loads file params
+if ! [ "$showHelp" = "on" ] && ! [ "$editMode" = "on" ]; then
+	declare -a fileNames
+	if [ $# -ge $OPTIND ]; then
+		args=( $@ )
+		for i in `seq $((OPTIND-1)) $((${#args[@]}-1))`; do
+			fileNames=(${fileNames[@]} ${args[$i]})
+		done
+		unset args
+	fi
 fi
 
-# Defaults
+# Sets defaults
 alignCols=${cols:-30}
 REMOTE_HOSTS_LIST=${REMOTE_HOSTS_LIST:-~/ssh_hosts_list}
 
+# Declares machine info maps
 declare -A availableSystems
 declare -A availableSystemHosts
 
-# Load remote hosts
+# Loads remote hosts to maps
 source $REMOTE_HOSTS_LIST
-# List file entry example - you need both array assignment lines to register a new machine
-# The machine name cant contain any special characters or white spaces
-#   name="Machine-name-no-spaces-or-special-characters"
-#   availableSystems[$name]=/path/to/your/private/key
-#   availableSystemHosts[$name]=user@host.address
 
 # Stores number of available machines
 machineCount=${#availableSystems[@]}
+
 # Sorts machines alphabetically by name
 sortKeys() {
 	for id in "${!availableSystems[@]}"; do
@@ -64,11 +70,50 @@ sortKeys() {
 	rm ~/.keys.tmp
 }
 
+# Shows usage / help text
+showUsage() {
+	scriptName=`basename "$0"`
+	echo "Usage:"
+	echo "  $scriptName [option:argument] [files]"
+	echo
+	echo "Options:"
+	echo "  -h       Shows this help text and exits."
+	echo
+	echo "  -e       Edits current REMOTE_HOSTS_LIST file using default \$EDITOR or vim."
+	echo "           If the file is missing, creates a default with sample values."
+	echo
+	echo "  -m n     n: machine number. Skips the machine listing and uses the"
+	echo "           machine attached to that number, if valid. Ignores non-integers."
+	echo
+	echo "  -c n     n: machine name offset size. Number of columns the machine"
+	echo "           name will use, with blanks on the right. Ignores non-integers."
+	echo "           Default: 30."
+	echo
+	echo "  -u f     f: file path. Path where uploaded files will be saved remotely."
+	echo
+	echo "  -d f     f: file path. Path where downloaded files will be saved locally."
+	echo
+	echo "  files    Extra params that will be considered paths for upload or a single"
+	echo "           path for download. Wildcards can be used for downloading, but as of"
+	echo "           now it might bug if it matches anything locally."
+	echo
+	if [ $machineCount -eq 0 ]; then
+		echo
+		echo "You have no machines registered. To register a machine, create a"
+		echo "REMOTE_HOSTS_LIST file, export its path to the REMOTE_HOSTS_LIST variable"
+		echo "and follow the pattern, one for each entry:"
+		echo "  name=\"Machine-name-no-spaces-or-special-characters\""
+		echo "  availableSystems[\$name]=/path/to/your/private/key"
+		echo "  availableSystemHosts[\$name]=user@host.address"
+	fi
+}
+
+# Selects a machine to connect to
 selectMachine() {
-	select selectedMachine in "${sortedKeys[@]}" Sair
+	select selectedMachine in "${sortedKeys[@]}" Exit
 	do
 		case $selectedMachine in
-			Sair)
+			Exit)
 			  echo 0;
 				break;;
 			*)
@@ -82,35 +127,7 @@ selectMachine() {
 	done
 }
 
-showUsage() {
-	scriptName=`basename "$0"`
-	echo "Usage:"
-	echo "  $scriptName [option:argument] [files]"
-	echo
-	echo "Options:"
-	echo "  -h    show this help"
-	echo
-	echo "  -m n  n: machine number. Skips the machine listing and uses the"
-	echo "        machine attached to that number, if valid. Ignores non-integers."
-	echo
-	echo "  -c n  n: machine name offset size. Number of columns the machine"
-	echo "        name will use, with blanks on the right."
-	echo "        Default: 30"
-	echo
-	echo "  -u f  f: file path. Path where uploaded files will be saved remotely."
-	echo
-	echo "  -d f  f: file path. Path where downloaded files will be saved locally."
-	if [ $machineCount -eq 0 ]; then
-		echo
-		echo "You have no machines registered. To register a machine, create a"
-		echo "REMOTE_HOSTS_LIST file, export its path to the REMOTE_HOSTS_LIST variable"
-		echo "and follow the pattern, one for each entry:"
-		echo "  name=\"Machine-name-no-spaces-or-special-characters\""
-		echo "  availableSystems[\$name]=/path/to/your/private/key"
-		echo "  availableSystemHosts[\$name]=user@host.address"
-	fi
-}
-
+# Loads machine params
 getMachineParams() {
 	for i in "${!sortedKeys[@]}"; do
 		if [ $i -eq $1 ]; then
@@ -122,11 +139,13 @@ getMachineParams() {
 	done
 }
 
+# Connects to machine using SSH
 connectToMachine() {
 	echo "Connecting to $system.."
 	ssh -i $systemKey $systemHost
 }
 
+# Downloads files from machine using SCP
 downloadFromMachine() {
 	if ! [ ${#fileNames[@]} -eq 1 ]; then
 		echo "You need to specify a folder or file to download."
@@ -136,6 +155,7 @@ downloadFromMachine() {
 	fi
 }
 
+# Uploads files to machine using SCP
 uploadToMachine() {
 	if [ ${#fileNames[@]} -eq 0 ]; then
 		echo "You need to specify folders or files to upload."
@@ -145,24 +165,52 @@ uploadToMachine() {
 	fi
 }
 
+# Creates a sample hosts file
+createSampleHost() {
+	if ! [ -f $REMOTE_HOSTS_LIST ]; then
+		echo "#!/bin/bash" >> $REMOTE_HOSTS_LIST
+		echo >> $REMOTE_HOSTS_LIST
+		echo "# MACHINES LIST" >> $REMOTE_HOSTS_LIST
+		echo >> $REMOTE_HOSTS_LIST
+		echo "name=\"Machine-name-no-spaces-or-special-characters\"" >> $REMOTE_HOSTS_LIST
+		echo "availableSystems[\$name]=/path/to/your/private/key" >> $REMOTE_HOSTS_LIST
+		echo "availableSystemHosts[\$name]=user@host.address" >> $REMOTE_HOSTS_LIST
+		echo >> $REMOTE_HOSTS_LIST
+		echo "unset name" >> $REMOTE_HOSTS_LIST
+		echo "# END MACHINES LIST" >> $REMOTE_HOSTS_LIST
+		echo >> $REMOTE_HOSTS_LIST
+	fi
+}
+
+# Starts the script
 start() {
-	if [ $machineCount -eq 0 ] || ! [ -z "${showHelp+x}" ]; then
+	if [ "$editMode" = "on" ]; then
+		createSampleHost
+		${EDITOR:-vim} $REMOTE_HOSTS_LIST
+		exit 0
+	fi
+
+	if [ $machineCount -eq 0 ] || [ "$showHelp" = "on" ]; then
 		showUsage
 		exit 0
 	fi
+
 	declare -a sortedKeys; sortKeys
+
 	if [ -z ${machine+x} ]; then
 		machine=$(selectMachine)
 	fi
+
 	if [ $machine -lt 0 ] || [ $machine -gt $machineCount ]; then
 		echo "You picked an invalid machine."
 		machine=$(selectMachine)
 	fi
+
 	if [ $machine -eq 0 ]; then
 		exit 1
 	fi
+
 	getMachineParams $machine
-	echo
 
 	if ! [ -z "${downloadPath+x}" ]; then
 		downloadFromMachine
