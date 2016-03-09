@@ -1,0 +1,239 @@
+#!/usr/local/bin/bash
+
+# Declares remote info maps
+declare -A availableSystems
+declare -A availableSystemHosts
+
+# Loads remote hosts to maps if file exists
+remoteHostsListFile=${AUTOSSH_REMOTE_HOSTS:-~/ssh_hosts_list}
+if [ -f $remoteHostsListFile ]; then
+	source $remoteHostsListFile
+fi
+
+# Stores number of available remotes
+remoteCount=${#availableSystems[@]}
+
+# Loads params
+while getopts :hexc:r:d:u: opt; do
+	NUMBER_REGEX='^[0-9]+$'
+	case $opt in
+		h)
+			showHelp="on";
+			break;;
+		e)
+			editMode="on";
+			break;;
+		x)
+			explainMode="on";;
+		c)
+			if [[ $OPTARG =~ $NUMBER_REGEX ]]; then
+				cols=$OPTARG;
+			fi;;
+		r)
+			if [[ $OPTARG =~ $NUMBER_REGEX ]]; then
+				remote=$OPTARG;
+			fi;;
+		d)
+			downloadPath="$OPTARG";;
+		u)
+			uploadPath="$OPTARG";;
+		:)
+			echo "Option -$OPTARG requires an argument.";;
+	esac
+done
+
+# Loads file params
+if ! [ "$showHelp" = "on" ] && ! [ "$editMode" = "on" ]; then
+	declare -a fileNames
+	if [ $# -ge $OPTIND ]; then
+		args=( $@ )
+		for i in `seq $((OPTIND-1)) $((${#args[@]}-1))`; do
+			fileNames=(${fileNames[@]} ${args[$i]})
+		done
+		unset args
+	fi
+fi
+
+# Sets default remote name truncate size
+alignCols=${cols:-30}
+
+# Sorts remotes alphabetically by name
+sortKeys() {
+	for id in "${!availableSystems[@]}"; do
+		echo $id;
+	done | sort -r > ~/.keys.tmp
+	entry=`tail -n -1 ~/.keys.tmp`
+	i=1
+	while [ ! "$entry" = "" ]; do
+		printf -v entry "%-"$alignCols"s(%s)" $entry ${availableSystemHosts[$entry]}
+		sortedKeys[$i]="$entry"
+		i=$((i + 1))
+		sed -ie '$d' ~/.keys.tmp
+		entry=`tail -n -1 ~/.keys.tmp`
+	done
+	rm ~/.keys.tmp
+}
+
+# Shows usage / help text
+showUsage() {
+	scriptName=`basename "$0"`
+	echo "Usage:"
+	echo "  $scriptName [opt] [opt arg] [files]"
+	echo
+	echo "Examples:"
+	echo "  $scriptName -c 10"
+	echo "           Prompts to connect to remote list"
+	echo
+	echo "  $scriptName -c 10"
+	echo
+	echo "Options:"
+	echo "  -h       Shows this help text and exits."
+	echo
+	echo "  -e       Edits current AUTOSSH_REMOTE_HOSTS file using default \$EDITOR or vim. If the file is missing, creates a default with sample values."
+	echo
+	echo "  -x       Explain mode. Prints the remote connecting command before executing."
+	echo
+	echo "  -r n     n: remote number. Skips the remote hosts listing and uses the remote attached to that number, if valid. Ignores non-integers."
+	echo
+	echo "  -c n     n: remote name offset size. Number of columns the remote name will use, with blanks on the right. Ignores non-integers. Default: 30."
+	echo
+	echo "  -u f     f: file path. Path where uploaded files will be saved remotely."
+	echo
+	echo "  -d f     f: file path. Path where downloaded files will be saved locally."
+	echo
+	echo "  files    Extra params that will be considered paths for upload or a single path for download. Wildcards can be used for downloading, but as of now it might bug if it matches anything locally."
+	echo
+	if [ $remoteCount -eq 0 ]; then
+		echo
+		echo "You have no remotes registered. To register a remote, create a AUTOSSH_REMOTE_HOSTS file, export its path to the AUTOSSH_REMOTE_HOSTS variable and follow the pattern, one for each entry:"
+		echo "  name=\"Remote-name-no-spaces-or-special-characters\""
+		echo "  availableSystems[\$name]=/path/to/your/private/key"
+		echo "  availableSystemHosts[\$name]=user@host.address"
+	fi
+}
+
+# Selects a remote to connect to
+selectRemote() {
+	select selectedRemote in "${sortedKeys[@]}" Exit
+	do
+		case $selectedRemote in
+			Exit)
+			  echo 0;
+				break;;
+			*)
+				if [ $REPLY -gt ${#sortedKeys[@]} ] || [ $REPLY -lt 1 ]; then
+					shift;
+				else
+					echo $REPLY;
+					break;
+				fi
+		esac
+	done
+}
+
+# Loads remote params
+getRemoteParams() {
+	for i in "${!sortedKeys[@]}"; do
+		if [ $i -eq $1 ]; then
+			system=`echo ${sortedKeys[$i]} | cut -d" " -f1`
+			systemKey=${availableSystems[$system]}
+			systemHost=${availableSystemHosts[$system]}
+			break
+		fi
+	done
+}
+
+# Connects to remote using SSH
+connectToRemote() {
+	if [ "$explainMode" = "on" ]; then
+		echo "The following command will be executed:"
+		echo "ssh -i $systemKey $systemHost"
+	fi
+	echo "Connecting to $system.."
+	ssh -i $systemKey $systemHost
+}
+
+# Downloads files from remote using SCP
+downloadFromRemote() {
+	if ! [ ${#fileNames[@]} -eq 1 ]; then
+		echo "You need to specify a folder or file to download."
+	else
+		if [ "$explainMode" = "on" ]; then
+			echo "The following command will be executed:"
+			echo "scp -i $systemKey $systemHost:\"${fileNames}\" \"$downloadPath\""
+		fi
+		echo "Downloading files from $system.."
+		scp -i $systemKey $systemHost:"${fileNames}" "$downloadPath"
+	fi
+}
+
+# Uploads files to remote using SCP
+uploadToRemote() {
+	if [ ${#fileNames[@]} -eq 0 ]; then
+		echo "You need to specify folders or files to upload."
+	else
+		if [ "$explainMode" = "on" ]; then
+			echo "The following command will be executed:"
+			echo "scp -i $systemKey \"${fileNames[@]}\" $systemHost:\"$uploadPath\""
+		fi
+		echo "Uploading files to $system.."
+		scp -i $systemKey "${fileNames[@]}" $systemHost:"$uploadPath"
+	fi
+}
+
+# Creates a sample hosts file
+createSampleHost() {
+	if ! [ -f $remoteHostsListFile ]; then
+		echo "#!/bin/bash" >> $remoteHostsListFile
+		echo >> $remoteHostsListFile
+		echo "# REMOTES LIST" >> $remoteHostsListFile
+		echo >> $remoteHostsListFile
+		echo "name=\"Remote-name-no-spaces-or-special-characters\"" >> $remoteHostsListFile
+		echo "availableSystems[\$name]=/path/to/your/private/key" >> $remoteHostsListFile
+		echo "availableSystemHosts[\$name]=user@host.address" >> $remoteHostsListFile
+		echo >> $remoteHostsListFile
+		echo "unset name" >> $remoteHostsListFile
+		echo "# END REMOTES LIST" >> $remoteHostsListFile
+	fi
+}
+
+# Starts the script
+start() {
+	if [ "$editMode" = "on" ]; then
+		createSampleHost
+		${EDITOR:-vim} $remoteHostsListFile
+		exit 0
+	fi
+
+	if [ $remoteCount -eq 0 ] || [ "$showHelp" = "on" ]; then
+		showUsage
+		exit 0
+	fi
+
+	declare -a sortedKeys; sortKeys
+
+	if [ -z ${remote+x} ]; then
+		remote=$(selectRemote)
+	fi
+
+	if [ $remote -lt 0 ] || [ $remote -gt $remoteCount ]; then
+		echo "You picked an invalid remote."
+		remote=$(selectRemote)
+	fi
+
+	if [ $remote -eq 0 ]; then
+		exit 1
+	fi
+
+	getRemoteParams $remote
+
+	if ! [ -z "${downloadPath+x}" ]; then
+		downloadFromRemote
+	elif ! [ -z "${uploadPath+x}" ]; then
+		uploadToRemote
+	else
+		connectToRemote
+	fi
+}
+
+start

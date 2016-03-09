@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# REMOTES LIST
+
+name="Remote-name-no-spaces-or-special-characters"
+availableSystems[$name]=/path/to/your/private/key
+availableSystemHosts[$name]=user@host.address
+
+unset name
+# END REMOTES LIST
