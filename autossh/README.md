@@ -8,5 +8,6 @@ Examples of use:
 
 - `autossh -e` edits your remote hosts file, creating a sample if not existent.
 - `autossh -x -r 3` or `autossh -x -r3` connects you to the third remote available, sorted alphabetically, from your hosts file.
-- `autossh -xr1 -d. /absolute/path/files*` downloads all files matching the pattern `/absolute/path/files*` from your registered remote #1 to the current working directory, showing the `scp` command that will be executed beforehand. Works with relative paths.
-- `autossh -r1 -u /absolute/remote/path/ /absolute/path/files* relative/path/files*` uploads all files matching the patterns `/absolute/path/files*` and `relative/path/files*` from your local computer to the `/absolute/remote/path/` directory on your registered remote host #2. Works with relative paths.
+- `autossh -xr1 -d. /absolute/path/files*` downloads all files matching the pattern `/absolute/path/files*` from your registered remote #1 to the current working directory, showing the `scp` command that will be executed beforehand.
+- `autossh -r1 -u /absolute/remote/path/ /absolute/path/files* relative/path/files*` uploads all files matching the patterns `/absolute/path/files*` and `relative/path/files*` from your local computer to the `/absolute/remote/path/` directory on your registered remote host #2.
+- `autossh -xc50 -d relative/destination/path /absolute/path/files* relative/path/files*` downloads all files matching the patterns `/absolute/path/files*` and `relative/path/files*` from your registered remote #1 to the `relative/destination/path` directory, showing the `scp` command that will be executed beforehand.
