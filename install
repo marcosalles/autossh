@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+echo "Will install autossh to '$HOME/programs'."
+mkdir -p $HOME/programs
+cd $HOME/programs
+git clone https://github.com/marcosalles/autossh.git
+
+sudo ln -s $HOME/programs/autossh/autossh /usr/local/bin/autossh
+cp autossh/sample_hosts_list $HOME/ssh_hosts_list
+
+echo "Configure your '$HOME/ssh_hosts_list' file before executing! Run 'autossh -e' to edit!"
+echo "All finished!"
+exit 0
