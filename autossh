@@ -1,6 +1,6 @@
 
 # Loads lits of remote keys
-remoteHostsListFile=${AUTOSSH_REMOTE_HOSTS:-~/ssh_hosts_list}
+remoteHostsListFile=${AUTOSSH_REMOTE_HOSTS:-$HOME/ssh_hosts_list}
 remoteHosts=($(grep -E "^remoteHost" "$remoteHostsListFile" | awk '{print $2}'))
 
 # Stores number of available remotes
@@ -54,8 +54,8 @@ alignCols=${cols:-30}
 sortHosts() {
 	for id in "${remoteHosts[@]}"; do
 		echo $id;
-	done | sort -r > ~/.keys.tmp
-	entry=$(tail -n -1 ~/.keys.tmp)
+	done | sort -r > /tmp/.keys.tmp
+	entry=$(tail -n -1 /tmp/.keys.tmp)
 	i=1
 	while [ ! "$entry" == "" ]; do
 		loadRemoteParams $entry
@@ -63,10 +63,10 @@ sortHosts() {
 		sortedHosts[$i]="$entryInfo"
 		sortedKeys[$i]="$entry"
 		i=$((i + 1))
-		sed -ie '$d' ~/.keys.tmp
-		entry=$(tail -n -1 ~/.keys.tmp)
+		sed -ie '$d' /tmp/.keys.tmp
+		entry=$(tail -n -1 /tmp/.keys.tmp)
 	done
-	rm ~/.keys.tmp
+	rm /tmp/.keys.tmp
 }
 
 # Shows usage / help text
@@ -104,7 +104,7 @@ showUsage() {
 		echo "You have no remotes registered. To register a remote, create a AUTOSSH_REMOTE_HOSTS file, export its path to the AUTOSSH_REMOTE_HOSTS variable and follow the pattern, one for each entry:"
 		echo "  remoteHost remote-key-no-spaces-or-special-characters && {"
 		echo "    hostName=\"Your host name written however you want it to\""
-		echo "    sshKey=/path/to/your/private/key (or only key file if in ~/.ssh)"
+		echo "    sshKey=/path/to/your/private/key (or only key file if in $HOME/.ssh)"
 		echo "    userName=remote host user"
 		echo "    address=remote host address"
 		echo "  }"
@@ -137,7 +137,7 @@ loadRemoteParams() {
 	function remoteHost { test $1 = $localRemote; }
 	source $remoteHostsListFile
 	if [ ! -f $sshKey ]; then
-		sshKey=~/.ssh/$sshKey
+		sshKey=$HOME/.ssh/$sshKey
 	fi
 	if [ ! -f $sshKey ]; then
 		echo "Host key for '$localRemote' not found. Check your '$AUTOSSH_REMOTE_HOSTS' file."
@@ -188,12 +188,12 @@ uploadToRemote() {
 
 # Creates a sample hosts file
 createSampleHost() {
-	if ! [ -f $remoteHostsListFile ]; then
+	if [ ! -f $remoteHostsListFile ]; then
 		echo "# REMOTES LIST" >> $remoteHostsListFile
 		echo >> $remoteHostsListFile
 		echo "remoteHost remote-key-no-spaces-or-special-characters && {" >> $remoteHostsListFile
 		echo "  hostName=\"Your host name written however you want it to\"" >> $remoteHostsListFile
-		echo "  sshKey=/path/to/your/private/key (or only key file if in ~/.ssh)" >> $remoteHostsListFile
+		echo "  sshKey=/path/to/your/private/key (or only key file if in $HOME/.ssh)" >> $remoteHostsListFile
 		echo "  userName=remote host user" >> $remoteHostsListFile
 		echo "  address=remote host address" >> $remoteHostsListFile
 		echo "}" >> $remoteHostsListFile
