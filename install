@@ -7,7 +7,9 @@ cd $HOME/programs
 git clone https://github.com/marcosalles/autossh.git
 
 sudo ln -s $HOME/programs/autossh/autossh /usr/local/bin/autossh
-cp autossh/sample_hosts_list $HOME/ssh_hosts_list
+if [ ! -f "$HOME/ssh_hosts_list" ]; then
+	cp autossh/sample_hosts_list $HOME/ssh_hosts_list
+fi
 
 echo "Configure your '$HOME/ssh_hosts_list' file before executing! Run 'autossh -e' to edit!"
 echo "All finished!"
