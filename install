@@ -6,7 +6,7 @@ mkdir -p $HOME/programs
 cd $HOME/programs
 git clone https://github.com/marcosalles/autossh.git
 
-sudo ln -fs $HOME/programs/autossh/autossh "/usr/local/bin/autossh"
+sudo ln -sf $HOME/programs/autossh/autossh "/usr/local/bin/autossh"
 if ! [ -f "$HOME/ssh_hosts_list" ]; then
 	cp autossh/sample_hosts_list $HOME/ssh_hosts_list
 fi
