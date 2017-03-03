@@ -1,10 +1,8 @@
-
 # Loads lits of remote keys
 remoteHostsListFile=${AUTOSSH_REMOTE_HOSTS:-$HOME/ssh_hosts_list}
 remoteHosts=($(grep -E "^remoteHost" "$remoteHostsListFile" | awk '{print $2}'))
-
 # Stores number of available remotes
-remoteCount=${#remoteHosts}
+remoteCount=${#remoteHosts[@]}
 
 # Loads params
 while getopts :hexc:r:d:u: opt; do
