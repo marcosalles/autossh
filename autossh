@@ -148,10 +148,10 @@ loadRemoteParams() {
 connectToRemote() {
 	if [ "$explainMode" = "on" ]; then
 		echo "The following command will be executed:"
-		echo "ssh -i $sshKey $systemHost"
+		echo "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $sshKey $systemHost"
 	fi
 	echo "Connecting to $hostName.."
-	ssh -i $sshKey $systemHost
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $sshKey $systemHost
 }
 
 # Downloads files from remote using SCP
@@ -162,11 +162,11 @@ downloadFromRemote() {
 		fileNames=$(echo "\"${fileNames[@]}\"")
 		if [ "$explainMode" = "on" ]; then
 			echo "The following command will be executed:"
-			echo "scp -i $sshKey $systemHost:${fileNames} \"$downloadPath\""
+			echo "scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $sshKey $systemHost:${fileNames} \"$downloadPath\""
 		fi
 		echo "Downloading files from $hostName.."
 		# Workaround because the fuckin bash is surrounding my string with single-quotes
-		eval $(echo "scp -i $sshKey $systemHost:${fileNames} \"$downloadPath\"")
+		eval $(echo "scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $sshKey $systemHost:${fileNames} \"$downloadPath\"")
 	fi
 }
 
